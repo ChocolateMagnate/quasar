@@ -9,7 +9,7 @@ performance, compatibility and use of use.
 4. Build
 ```shell
 # RHEL/Fedora
-dnf install mimalloc libzstd mimalloc-devel libzstd-devel
+dnf install libcxx libcxx-devel clang-tools-extra mimalloc libzstd mimalloc-devel libzstd-devel
 mkdir build && cd build
 cmake ..
 make -j$(nproc)

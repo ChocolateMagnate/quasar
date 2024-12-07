@@ -1,6 +1,6 @@
 #include <print>
 
-#include <zstd.h>v // Checking if linkage works
+#include <zstd.h> // Checking if linkage works
 
 int main() {
   std::println("Hello, World!");
