@@ -15,7 +15,6 @@ add_executable(quasar
         include/quasar/Bitcode.hpp
         include/quasar/Iteration.hpp
         src/quasar/Bitcode.cpp
-        include/quasar/lib/AbstractSyntaxTree.hpp
 )
 
 target_include_directories(quasar PUBLIC
@@ -24,4 +23,5 @@ target_include_directories(quasar PUBLIC
 
 target_link_libraries(quasar PRIVATE mimalloc zstd
         absl::flat_hash_map
-        absl::strings)
+        absl::strings
+)

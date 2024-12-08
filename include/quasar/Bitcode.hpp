@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <string>
-#include <variant>
 
 #include <absl/container/flat_hash_map.h>
 
@@ -11,8 +10,13 @@
 
 namespace quasar::bitcode {
   enum class Opcode: uint8_t {
+    Allocate,                // Allocates a new register of provided type
     LoadConstant,            // Load a value from static code section into a register
-    LoadRegister,            // Load a register into current context
+    LoadRegister,            // Load a register into current context from the market
+    Store,                   // Stores register in the market
+
+    IntegerToFloat,          // Converts an integer value to a floating-point number (__float__)
+    FloatToInteger,          // Converts a floating-point number to integer (__int__)
 
     Add,                     // Sum 2 values (__add__)
     Subtract,                // Subtract 2 values (__sub__)
@@ -64,29 +68,39 @@ namespace quasar::bitcode {
     YieldFrom,               // Yields a value from another generator (yield from)
     Await,                   // Awaits a coroutine
 
-    Map,                     // Maps first operand to second operand in nested context
     Jump,                    // Jumps to code section directly
     Branch,                  // Conditionally jumps to section if condition is true,
     Call,                    // Calls a callable (either executes a function or calls __call__)
     Return                   // Returns From a function
   };
 
-  /// The most primitive unit of bitcode is an instruction. It describes the
-  /// operation to commit and any arguments if needed and operates on a set
-  /// of sizeof(size_t) / 2 number of virtual registers. Internally an
-  /// instruction is simply an opcode and 1 or 2 operands. For Load and Store
-  /// opcodes, operand is whole size_t value that represents the pointer, and
-  /// for other instructions, a single size_t value is split into 2 operands.
-  /// These are interpreted as virtual registers. These are up to 4 billion
-  /// virtual registers on 64-bit architectures that begin to route after the end.
-  struct Instruction {
-    Opcode Opcode;
-    std::variant<void*, size_t> Operands;
+  /// Basic block is a unit of linear code with no jumps. Branching is implemented as multiple
+  /// titled basic blocks representing the structure that are terminated by jumping, calling or
+  /// returning instructions. Instructions themselves are binary-encoded and are interpreted on
+  /// each instruction basis.
+  typedef std::vector<std::byte> BasicBlock;
+
+  /// Metadata about Python module information.
+  struct ModuleConfiguration {
+    std::string Documentation;  // __doc__
+    std::string Name;           // __name__
+    std::string Loader;         // __loader__
+    std::string Package;        // __package__
+    std::string Specification;  // __spec__
   };
 
-
-  typedef std::vector<Instruction> BasicBlock;
-
+  /// Module is a major compilation unit of the Quasar bitcode that represents the code of a single
+  /// file, which coincidentally maps to Python modules. A module consists of its __name__
+  /// property, a set of basic blocks, static code section and 2 tables for type ids and registers.
+  /// Basic blocks are the sequential unit of instructions that ends with branching, and different
+  /// functions and composable parts are implemented as public basic blocks that in turn internally
+  /// call private public blocks that begin with double underscores. The name property is the
+  /// string assigned to the __name__ variable. Static code section is memory section where
+  /// constants take place as strings, such as "Hello world!" in print("Hello world!").
+  /// Registers are virtual nomenclature of immutable  values that can store just a single
+  /// statically typed value. Finally, type ids is a table where each type is referenced as index.
+  /// Together these components allow for space efficient code representation by opcode, type id
+  /// and registers.
   class Module : public RangeBase<BasicBlock, Module> {
     public:
       Module() = default;
@@ -101,6 +115,9 @@ namespace quasar::bitcode {
       /// @param key The key the basic block is available for jumping.
       /// @param bb The basic block to store in the module.
       void InsertBasicBlock(const std::string& key, const BasicBlock& bb) noexcept;
+
+
+      [[nodiscard]] ModuleConfiguration GetModuleConfiguration() const noexcept;
 
       /// Retrieves list of modules that were imported in the module. Each
       /// element is a typically short string that represent the import
@@ -119,8 +136,13 @@ namespace quasar::bitcode {
 
     private:
       absl::flat_hash_map<std::string, BasicBlock> Blocks;
-      std::vector<std::string> StaticCodeSection;
       std::vector<std::string> ImportDeclaredNames;
+      std::vector<std::string> StaticCodeSection;
+      ModuleConfiguration Config;
+      size_t NextRegister = 0;
+      size_t NextTypeId = 0;
   };
+
+
 }
 #endif //QUASAR_BITCODE_HPP
